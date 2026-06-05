@@ -1,7 +1,8 @@
-fastapi==0.115.0
-uvicorn==0.30.6
-pydantic==2.9.2
-scikit-learn==1.5.2
-pandas==2.2.3
-numpy==1.26.4
-playwright==1.47.0
+# Apollo racing tipster — runtime deps
+streamlit>=1.40
+pandas>=2.2
+numpy>=1.26
+scikit-learn>=1.5
+pyarrow>=16.0
+requests>=2.31
+betfairlightweight>=2.20   # live Betfair Exchange API (AU/NZ racecards)
