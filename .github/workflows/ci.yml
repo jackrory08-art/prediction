@@ -1,0 +1,32 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt pytest
+
+      - name: Generate fixtures
+        run: python tests/make_fixtures.py
+
+      - name: Ingest fixtures into DB
+        run: python ingest.py --from-fixtures
+
+      - name: Train on fixtures
+        run: python train_model.py
+
+      - name: Run predict CLI
+        run: python predict.py
+
+      - name: Pytest
+        run: pytest -q

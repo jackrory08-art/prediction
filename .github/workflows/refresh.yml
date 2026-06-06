@@ -1,0 +1,60 @@
+name: Refresh data & retrain
+
+# Runs in the cloud (GitHub's servers) — nothing on your computer.
+# Pulls fresh Betfair history, retrains the model, commits the updated
+# apollo.db + apollo_brain.pkl. Streamlit Cloud auto-redeploys on the commit.
+on:
+  schedule:
+    - cron: "0 18 * * *"      # daily 18:00 UTC (early morning AEST)
+  workflow_dispatch:           # manual "Run workflow" button
+    inputs:
+      days:
+        description: "Days of history to ingest"
+        default: "365"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Ingest history
+        env:
+          BETFAIR_APP_KEY: ${{ secrets.BETFAIR_APP_KEY }}
+          BETFAIR_USERNAME: ${{ secrets.BETFAIR_USERNAME }}
+          BETFAIR_PASSWORD: ${{ secrets.BETFAIR_PASSWORD }}
+        run: |
+          if [ -n "$BETFAIR_APP_KEY" ]; then
+            python ingest.py --days "${{ github.event.inputs.days || '365' }}" \
+              --regions AUS,GB,IRE,USA
+          else
+            echo "No Betfair secrets set yet — ingesting committed fixtures so CI stays green."
+            python ingest.py --from-fixtures
+          fi
+
+      - name: Train
+        run: python train_model.py
+
+      - name: Commit refreshed data + model
+        run: |
+          git config user.name  "apollo-bot"
+          git config user.email "apollo-bot@users.noreply.github.com"
+          git add -f apollo.db apollo_brain.pkl
+          git commit -m "chore: refresh data & retrain ($(date -u +%Y-%m-%d))" || {
+            echo "Nothing changed."; exit 0; }
+          git push
